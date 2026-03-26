@@ -1,0 +1,196 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand-500: #38bdf8;
+  --color-brand-600: #818cf8;
+  --color-glass-bg: rgba(13, 27, 42, 0.65);
+  --color-glass-border: rgba(99, 179, 237, 0.15);
+}
+
+@layer base {
+  body {
+    background-color: #0a0e1a;
+    color: #f8fafc;
+    font-family: 'Outfit', sans-serif;
+  }
+}
+
+@layer utilities {
+  .glass-panel {
+    background: var(--color-glass-bg);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid var(--color-glass-border);
+    border-radius: 20px;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  }
+
+  .text-gradient {
+    background: linear-gradient(135deg, var(--color-brand-500), var(--color-brand-600));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+}
+
+/* Background Animated Gradient Orbs */
+.background-animations {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.gradient-sphere {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(120px);
+  opacity: 0.5;
+  animation: float 20s infinite ease-in-out alternate;
+}
+
+.shape-1 {
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, #38bdf8, transparent 60%);
+  top: -200px;
+  left: -200px;
+}
+
+.shape-2 {
+  width: 500px;
+  height: 500px;
+  background: radial-gradient(circle, #818cf8, transparent 60%);
+  bottom: -100px;
+  right: -100px;
+  animation-delay: -5s;
+}
+
+.shape-3 {
+  width: 400px;
+  height: 400px;
+  background: radial-gradient(circle, #ec4899, transparent 60%);
+  top: 40%;
+  left: 40%;
+  opacity: 0.2;
+  animation-delay: -10s;
+}
+
+@keyframes float {
+  0% { transform: translate(0, 0) scale(1); }
+  100% { transform: translate(100px, 50px) scale(1.1); }
+}
+
+@keyframes dropItem {
+  0% { transform: translateY(-150px) scale(0.3) rotate(-15deg); opacity: 0; }
+  60% { transform: translateY(20px) scale(1.1) rotate(5deg); opacity: 1; }
+  100% { transform: translateY(0) scale(1) rotate(0); opacity: 1; }
+}
+
+.animate-drop {
+  animation: dropItem 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+@keyframes fillBox {
+  0% { height: 0%; opacity: 0.2; }
+  100% { height: 100%; opacity: 0.15; }
+}
+
+.animate-fill {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  background: var(--color-brand-600);
+  animation: fillBox 1.2s ease-out forwards;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+@keyframes messageEnter {
+    from { opacity: 0; transform: translateY(16px) scale(0.98); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.animate-msg {
+    animation: messageEnter 0.4s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes titleGlow {
+    0%, 100% { filter: drop-shadow(0 0 10px rgba(56, 189, 248, 0.3)); }
+    50% { filter: drop-shadow(0 0 25px rgba(129, 140, 248, 0.8)); }
+}
+.animate-glow {
+    animation: titleGlow 4s ease-in-out infinite;
+}
+
+@media print {
+  body {
+    background: white;
+    color: black;
+  }
+  
+  /* Hide the app shell */
+  aside, 
+  .gradient-sphere, 
+  header, 
+  .no-print {
+    display: none !important;
+  }
+  
+  /* Reset Chat Container to flow infinitely down the page */
+  #chat-export-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
+    display: block !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  /* Make chat bubbles print elegantly */
+  .animate-msg {
+    page-break-inside: avoid;
+    break-inside: avoid;
+    box-shadow: none !important;
+    border: 1px solid #e5e7eb !important;
+    background: #f8fafc !important;
+    color: #0f172a !important;
+  }
+
+  /* Distinguish User vs AI in print */
+  .animate-msg.self-end {
+    background: #f0f9ff !important;
+    border-color: #bae6fd !important;
+  }
+}
+
+@keyframes layoutEnter {
+    from { opacity: 0; transform: translateX(-20px); }
+    to { opacity: 1; transform: translateX(0); }
+}
+.animate-layout-entry {
+    animation: layoutEnter 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes pulseBorder {
+    0%, 100% { border-color: rgba(56, 189, 248, 0.2); box-shadow: 0 0 0 0 rgba(56, 189, 248, 0); }
+    50% { border-color: rgba(56, 189, 248, 0.6); box-shadow: 0 0 20px 0 rgba(56, 189, 248, 0.2); }
+}
+.animate-pulse-border {
+    animation: pulseBorder 3s infinite ease-in-out;
+}
+
+
+/* Markdown parsing base styles */
+.markdown-body p { margin-bottom: 0.75em; }
+.markdown-body ul { list-style-type: disc; margin-left: 1.5rem; margin-bottom: 0.75em; }
+.markdown-body ol { list-style-type: decimal; margin-left: 1.5rem; margin-bottom: 0.75em; }
+.markdown-body strong { color: #f8fafc; font-weight: 600; }

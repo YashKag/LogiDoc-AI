@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LogiDoc AI v2 - Logistics Intelligence</title>
+    
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    
+    <!-- Babel standalone for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Outfit', 'sans-serif'],
+                    },
+                    colors: {
+                        dark: {
+                            base: '#0f172a',
+                            panel: 'rgba(30, 41, 59, 0.7)',
+                            border: 'rgba(56, 189, 248, 0.15)',
+                        },
+                        accent: {
+                            1: '#38bdf8',
+                            2: '#818cf8',
+                        }
+                    },
+                    animation: {
+                        'float': 'float 20s infinite ease-in-out alternate',
+                        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                    },
+                    keyframes: {
+                        float: {
+                            '0%': { transform: 'translate(0, 0) scale(1)' },
+                            '100%': { transform: 'translate(100px, 50px) scale(1.1)' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <style>
+        body {
+            background-color: #0f172a;
+            color: #f8fafc;
+            overflow-x: hidden;
+            font-family: 'Outfit', sans-serif;
+        }
+        
+        /* Glassmorphism Classes */
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.65);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid rgba(56, 189, 248, 0.15);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); 
+        }
+
+        .text-gradient {
+            background: linear-gradient(135deg, #38bdf8, #818cf8);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .bg-gradient-btn {
+            background: linear-gradient(135deg, #38bdf8, #818cf8);
+            transition: all 0.3s ease;
+        }
+        .bg-gradient-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(129, 140, 248, 0.5);
+        }
+
+        /* Animated Orbs */
+        .bg-orb {
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(120px);
+            opacity: 0.5;
+            z-index: -1;
+            pointer-events: none;
+        }
+        
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 10px; }
+    </style>
+</head>
+<body>
+    <!-- Background Animations -->
+    <div class="fixed inset-0 z-[-1] overflow-hidden pointer-events-none">
+        <div class="bg-orb w-[600px] h-[600px] bg-sky-500/30 -top-[200px] -left-[200px] animate-float"></div>
+        <div class="bg-orb w-[500px] h-[500px] bg-indigo-500/30 -bottom-[100px] -right-[100px] animate-float" style="animation-delay: -5s;"></div>
+        <div class="bg-orb w-[400px] h-[400px] bg-pink-500/20 top-[40%] left-[40%] animate-float" style="animation-delay: -10s;"></div>
+    </div>
+
+    <!-- React Root -->
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // Custom Hook for API calls
+        const useApi = () => {
+            const uploadDoc = async (file) => {
+                const formData = new FormData();
+                formData.append('file', file);
+                const res = await fetch('/api/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                if(!res.ok) {
+                    const err = await res.json();
+                    throw new Error(err.detail || 'Upload failed');
+                }
+                return await res.json();
+            };
+
+            const sendChat = async (message, onChunk) => {
+                const res = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message })
+                });
+                if(!res.ok) {
+                    const err = await res.json();
+                    throw new Error(err.detail || 'Chat request failed');
+                }
+                const reader = res.body.getReader();
+                const decoder = new TextDecoder("utf-8");
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    const chunk = decoder.decode(value, { stream: true });
+                    onChunk(chunk);
+                }
+            };
+
+            return { uploadDoc, sendChat };
+        };
+
+        const App = () => {
+            const api = useApi();
+            const [messages, setMessages] = useState([
+                { id: 1, type: 'ai', content: 'Welcome to LogiDoc AI V2! Make sure your Ollama daemon is running, upload a logistics PDF, and ask me anything.' }
+            ]);
+            const [inputState, setInputState] = useState('');
+            const [loading, setLoading] = useState(false);
+            const [uploadStatus, setUploadStatus] = useState('');
+            const [docReady, setDocReady] = useState(false);
+            const chatEndRef = useRef(null);
+            
+            useEffect(() => {
+                chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+            }, [messages]);
+
+            const handleSend = async () => {
+                if(!inputState.trim() || loading) return;
+                
+                const userMsg = inputState.trim();
+                setInputState('');
+                const userMsgId = Date.now() + "-user";
+                const msgId = Date.now() + "-ai";
+                setMessages(prev => [...prev, 
+                    { id: userMsgId, type: 'user', content: userMsg },
+                    { id: msgId, type: 'ai', content: '', contextFound: true }
+                ]);
+                setLoading(true);
+                
+                try {
+                    await api.sendChat(userMsg, (chunkText) => {
+                        setMessages(prev => prev.map(m => 
+                            m.id === msgId ? { ...m, content: m.content + chunkText } : m
+                        ));
+                    });
+                } catch (err) {
+                    setMessages(prev => [...prev, { id: Date.now() + 2, type: 'error', content: err.message }]);
+                }
+                setLoading(false);
+            };
+
+            const handleFileUpload = async (e) => {
+                const file = e.target.files[0];
+                if(!file) return;
+                
+                setUploadStatus('Uploading & chunking...');
+                try {
+                    const res = await api.uploadDoc(file);
+                    setUploadStatus(`Success! Generated ${res.chunks} chunks.`);
+                    setDocReady(true);
+                } catch(err) {
+                    setUploadStatus(`Error: ${err.message}`);
+                }
+            };
+
+            // Removed handleSaveKey
+
+            return (
+                <div className="flex h-screen max-w-[1600px] mx-auto p-6 gap-6">
+                    
+                    {/* Sidebar */}
+                    <aside className="w-[320px] flex flex-col shrink-0">
+                        {/* Logo */}
+                        <div className="flex items-center gap-4 mb-10 pl-2">
+                            <i data-lucide="truck" className="text-4xl text-sky-400 opacity-90 drop-shadow-[0_0_10px_rgba(56,189,248,0.4)]"></i>
+                            <div>
+                                <h1 className="text-2xl font-bold text-gradient tracking-tight">LogiDoc AI</h1>
+                                <p className="text-xs text-slate-400 uppercase tracking-widest font-medium mt-1">Intelligence v2</p>
+                            </div>
+                        </div>
+
+                        {/* Upload Section */}
+                        <div className="mb-8">
+                            <h3 className="text-xs text-sky-400 uppercase tracking-widest font-semibold mb-4">Upload Document</h3>
+                            <label className="block border border-dashed border-sky-400/40 rounded-2xl p-8 text-center cursor-pointer bg-white/5 hover:bg-sky-400/10 hover:border-sky-400 hover:-translate-y-1 transition-all duration-300 relative group pointer-events-auto">
+                                <input type="file" className="hidden" accept=".pdf" onChange={handleFileUpload} />
+                                <i data-lucide="file-text" className="mx-auto mb-2 text-3xl opacity-70 group-hover:-translate-y-1 transition-transform"></i>
+                                <p className="font-semibold text-slate-200">Drag & Drop PDF</p>
+                                <p className="text-xs text-slate-400 mt-1">or click to browse</p>
+                            </label>
+                            {uploadStatus && (
+                                <div className={`mt-3 text-xs p-3 rounded-xl border ${uploadStatus.includes('Error') ? 'bg-red-500/10 text-red-400 border-red-500/20' : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'}`}>
+                                    {uploadStatus}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Settings Removed (Loaded from .env) */}
+
+                        {/* Footer Status */}
+                        <div className="mt-auto flex justify-between items-center text-xs text-slate-400 px-2 border-t border-sky-400/10 pt-4">
+                            <p>Built with React & Tailwind</p>
+                            <div className="flex items-center gap-2">
+                                <span className={`w-2 h-2 rounded-full ${docReady ? 'bg-emerald-500 shadow-[0_0_8px_#10b981] animate-pulse-slow' : 'bg-slate-500'}`}></span>
+                                <span>{docReady ? 'RAG Ready' : 'Awaiting Doc'}</span>
+                            </div>
+                        </div>
+                    </aside>
+
+                    {/* Main Chat Area */}
+                    <main className="flex-1 flex flex-col gap-6 overflow-hidden">
+                        {/* Header Panel */}
+                        <header className="glass-panel px-10 py-6 shrink-0 flex items-center justify-between rounded-[20px]">
+                            <div>
+                                <h2 className="text-2xl font-bold mb-1">Advanced Document Intelligence</h2>
+                                <p className="text-sm text-slate-400">Ask sophisticated queries across your logistics supply chain.</p>
+                            </div>
+                            <div className="flex gap-2">
+                                <span className="px-3 py-1 bg-white/5 border border-white/10 rounded-full text-xs font-medium text-slate-300">FastAPI Backend</span>
+                                <span className="px-3 py-1 bg-indigo-500/10 border border-indigo-500/30 rounded-full text-xs font-medium text-indigo-300">Ollama (Phi-3)</span>
+                            </div>
+                        </header>
+
+                        {/* Chat Panel */}
+                        <div className="glass-panel flex-1 flex flex-col overflow-hidden relative rounded-[20px]">
+                            {/* Messages */}
+                            <div className="flex-1 overflow-y-auto p-10 flex flex-col gap-8">
+                                {messages.map((m) => (
+                                    <div key={m.id} className={`flex gap-5 max-w-[85%] animate-[fadeInUp_0.4s_ease_forwards] ${m.type === 'user' ? 'self-end flex-row-reverse' : m.type === 'error' ? 'self-center bg-red-500/10 border border-red-500/30 p-4 rounded-xl text-red-100 max-w-full' : 'self-start'}`}>
+                                        
+                                        {m.type !== 'error' && (
+                                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-bold text-sm shrink-0 ${m.type === 'ai' ? 'bg-gradient-to-br from-sky-400 to-indigo-500 text-white shadow-[0_4px_15px_rgba(56,189,248,0.3)]' : 'bg-white/10 border border-white/10 text-slate-200'}`}>
+                                                {m.type === 'ai' ? 'AI' : 'YOU'}
+                                            </div>
+                                        )}
+                                        
+                                        {m.type !== 'error' && (
+                                            <div className={`p-5 text-[15px] leading-relaxed relative ${m.type === 'user' ? 'bg-sky-400/10 border border-sky-400/20 rounded-[24px] rounded-tr-sm' : 'bg-white/5 border border-sky-400/10 rounded-[24px] rounded-tl-sm shadow-sm'}`}>
+                                                {m.contextFound === false && (
+                                                    <div className="text-xs font-semibold text-rose-400 mb-2 uppercase tracking-wide flex items-center gap-1">
+                                                        <i data-lucide="alert-circle" className="w-3 h-3"></i> Notice: Missing Context
+                                                    </div>
+                                                )}
+                                                <div dangerouslySetInnerHTML={{ __html: m.content.replace(/\n\n/g, '<br/><br/>').replace(/\n/g, '<br/>').replace(/\*\*(.*?)\*\*/g, '<strong class="text-sky-400">$1</strong>') }} />
+                                            </div>
+                                        )}
+                                        
+                                        {m.type === 'error' && (
+                                            <div><i data-lucide="alert-triangle" className="inline mr-2"></i>{m.content}</div>
+                                        )}
+                                    </div>
+                                ))}
+                                
+                                {loading && (
+                                    <div className="flex gap-5 max-w-[85%] self-start animate-[fadeInUp_0.4s_ease_forwards]">
+                                        <div className="w-12 h-12 rounded-2xl flex items-center justify-center font-bold text-sm shrink-0 bg-gradient-to-br from-sky-400 to-indigo-500 text-white shadow-sm">AI</div>
+                                        <div className="p-5 bg-white/5 border border-sky-400/10 rounded-[24px] rounded-tl-sm flex items-center gap-2">
+                                            <div className="w-2 h-2 rounded-full bg-sky-400 animate-bounce"></div>
+                                            <div className="w-2 h-2 rounded-full bg-sky-400 animate-bounce" style={{animationDelay: '0.2s'}}></div>
+                                            <div className="w-2 h-2 rounded-full bg-sky-400 animate-bounce" style={{animationDelay: '0.4s'}}></div>
+                                        </div>
+                                    </div>
+                                )}
+                                <div ref={chatEndRef} />
+                            </div>
+
+                            {/* Input Area */}
+                            <div className="p-6 inset-x-0 bottom-0 border-t border-white/5 bg-[#0a0f1c]/50 backdrop-blur-md">
+                                <div className="flex items-center bg-white/5 border border-white/10 rounded-[20px] p-2 focus-within:border-sky-400 focus-within:ring-4 focus-within:ring-sky-400/10 focus-within:bg-white/10 transition-all">
+                                    <input 
+                                        type="text" 
+                                        className="flex-1 bg-transparent border-none text-slate-200 text-[15px] px-4 py-3 focus:outline-none placeholder-slate-500 font-medium" 
+                                        placeholder="Type your logistics question here... (Press Enter to send)"
+                                        value={inputState}
+                                        onChange={e => setInputState(e.target.value)}
+                                        onKeyDown={e => e.key === 'Enter' && handleSend()}
+                                        disabled={loading}
+                                    />
+                                    <button 
+                                        onClick={handleSend}
+                                        disabled={loading || !inputState.trim()}
+                                        className={`w-12 h-12 rounded-[14px] flex items-center justify-center transition-all ${!inputState.trim() ? 'bg-white/5 text-slate-500' : 'bg-gradient-btn text-white'} ml-2 shrink-0`}
+                                    >
+                                        <i data-lucide="send" className="w-5 h-5 -ml-1"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </main>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+
+        // Initialize Lucide icons right after render
+        setTimeout(() => lucide.createIcons(), 100);
+    </script>
+</body>
+</html>

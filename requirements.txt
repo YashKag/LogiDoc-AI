@@ -1,0 +1,9 @@
+pymupdf
+streamlit
+python-dotenv
+pandas
+plotly
+fpdf2
+groq
+sentence-transformers
+chromadb
